@@ -7,10 +7,11 @@
 Most email integrations for AI assistants either cover only Gmail and Microsoft 365, or hand the model full control of the mailbox. `safe-imap-mcp` is a small local [MCP](https://modelcontextprotocol.io) server for the common case in between: business mailboxes on an ordinary hosting provider (cPanel, Plesk, your own mail server), where you want an assistant to search, read, draft and send, but where one wrong tool call must never wipe your inbox.
 
 - Works with any IMAP/SMTP server and with several mailboxes at once.
-- Runs on your own computer. Passwords never leave it.
-- **No delete, move, expunge or purge operations exist in the code.** A test enforces this.
+- Runs on your own computer. Passwords stay there and are sent only to your own mail server, always encrypted.
+- **There is no tool to delete, move, expunge or purge mail.** A test checks the code for such calls.
 - Reading a message does not mark it as read.
-- Attachments can be sent from, and saved to, an allowlist of folders only.
+- Files can be attached only from folders you allow; files with keys or passwords are always refused.
+- Optional "approval folders": attaching from them requires a Yes/No dialog on your computer, which the assistant cannot answer.
 
 ## What the assistant can do
 
@@ -20,9 +21,9 @@ Most email integrations for AI assistants either cover only Gmail and Microsoft 
 | `list_folders` | Lists folders of a mailbox | No |
 | `search_emails` | Searches by sender, recipient, subject, text, dates, unread | No |
 | `read_email` | Reads a full message, lists its attachments | No (does not mark as read) |
-| `list_attachment_folders` | Shows which local folders are allowed for attachments | No |
+| `list_attachment_folders` | Shows which local folders are allowed for attachments and where attachments are saved | No |
 | `mark_as_read` | Sets or clears the read flag | Only the read flag |
-| `save_attachments` | Saves a message's attachments to a local folder | Writes new files, never overwrites |
+| `save_attachments` | Saves a message's attachments into `Downloads/mail-attachments` | Writes new files there, never overwrites |
 | `save_draft` | Saves a message to Drafts | Adds a draft |
 | `send_email` | Sends a message, optionally as a reply in the same thread, with attachments; stores a copy in Sent | Sends mail |
 
@@ -30,7 +31,7 @@ There is deliberately no tool to delete, move, archive or empty anything, and no
 
 ## Requirements
 
-- [Node.js](https://nodejs.org) 18 or newer
+- [Node.js](https://nodejs.org) 20 or newer
 - An MCP client: Claude Desktop, Claude Code, or any other client that supports local (stdio) MCP servers
 - IMAP and SMTP access to your mailbox with a password or an app password
 
@@ -41,10 +42,12 @@ There is deliberately no tool to delete, move, archive or empty anything, and no
 ```bash
 git clone https://github.com/hightengry/safe-imap-mcp.git
 cd safe-imap-mcp
-npm install
+npm ci
 ```
 
-Or download the ZIP from GitHub, unpack it, and run `npm install` inside the folder.
+Or download the ZIP from GitHub, unpack it, and run `npm ci` inside the folder. `npm ci` installs exactly the dependency versions recorded in `package-lock.json`.
+
+Keep the program folder outside Desktop, Documents and Downloads if you can (for example `C:\Tools\safe-imap-mcp` or `~/tools/safe-imap-mcp`). The connector refuses to attach anything from its own folder anyway, but it is a good habit.
 
 ### 2. Configure your mailboxes
 
@@ -125,30 +128,51 @@ claude mcp add email -- node /path/to/safe-imap-mcp/index.js
 | `imapPort` | account / defaults | `993` | IMAP port |
 | `smtpPort` | account / defaults | `465` | SMTP port (`587` uses STARTTLS) |
 | `imapSecure`, `smtpSecure` | account / defaults | from port | Force TLS on/off |
-| `attachmentFolders` | top level | Desktop, Documents, Downloads (incl. OneDrive variants) | Folders from which files may be attached and into which attachments are saved |
+| `attachmentFolders` | top level | Desktop, Documents, Downloads (incl. OneDrive variants) | Folders from which files may be attached freely. Set `[]` to allow none |
+| `approvalFolders` | top level | none | Folders from which files may be attached only after you click **Yes** in a dialog on your computer (Windows, macOS; Linux needs `zenity`) |
+| `saveFolder` | top level | `Downloads/mail-attachments` | The only folder where received attachments are saved |
 | `limits.maxRecipients` | top level | `20` | Max recipients (to + cc + bcc) per message |
 | `limits.maxAttachments` | top level | `10` | Max attachments per message |
 | `limits.maxAttachmentMB` | top level | `20` | Max total attachment size per message |
+| `limits.maxSendsPerHour` | top level | `20` | Max messages sent per hour (counted while the server runs) |
+
+Example of a strict setup: attach freely only from one folder, from your projects only after confirmation:
+
+```json
+{
+  "attachmentFolders": ["C:\\Users\\you\\Documents\\Outgoing"],
+  "approvalFolders": ["D:\\Work"],
+  "defaults": { "...": "..." },
+  "accounts": [ "..." ]
+}
+```
 
 The config file is re-read on every call, so you can change passwords or limits without restarting. To keep the config elsewhere, set `MAIL_ACCOUNTS_FILE=/path/to/accounts.json` in the server's environment (in Claude Desktop, via an `"env"` block next to `"args"`).
 
 ## Safety model
 
-The aim is that a confused, mistaken or manipulated assistant can at worst send an email you approved, never destroy data.
+The design goal is that a confused, mistaken or manipulated assistant cannot destroy mail and cannot send anything without your approval. Here is how, and where the limits are.
 
-1. **No destructive operations.** The code has no calls that delete, move, copy, expunge or rename messages or mailboxes, and never sets the IMAP `\Deleted` flag. `npm test` fails if any appear. All tools are annotated `destructiveHint: false`.
+1. **No destructive operations.** There are no tools and no code paths that delete, move, copy, expunge or rename messages or mailboxes, and the IMAP `\Deleted` flag is never set. `npm test` scans the source for such calls; this catches mistakes, it is not a formal proof. All tools are annotated `destructiveHint: false`.
 2. **Read without side effects.** Mailboxes are opened read-only for searching and reading.
 3. **Human approval for sending.** The `send_email` description instructs the assistant to show you sender, recipients, subject, full text and attachment paths and wait for your explicit approval. In Claude Desktop, also answer the tool permission prompt for `send_email` with **Allow once** rather than "Always allow", so every send needs a click.
-4. **Prompt-injection hygiene.** Incoming mail is untrusted. Tool descriptions tell the assistant to treat message content as data and never to attach files or add recipients because an email asked for it.
-5. **Attachment sandbox.** Files can be attached only from `attachmentFolders`. Symlinks are resolved first, `..` tricks are rejected, the program folder, the config file and the send log are always blocked, and files named like `accounts*.json` are refused. Saved attachments get sanitised names, never overwrite existing files, and are never opened.
-6. **Limits.** Recipient count, attachment count and total size are capped, so the tool cannot be used for bulk mail.
-7. **Audit log.** Every sent message is appended to `sent-log.txt` next to the config file: time, sender, recipients, subject, attachments.
+4. **Prompt-injection hygiene.** Incoming mail is untrusted. Tool descriptions tell the assistant to treat message content as data and never to attach files, add recipients, mark mail as read or save attachments because an email asked for it. This relies on the assistant following instructions, which is why points 3, 5 and 6 do not.
+5. **Attachment sandbox.** Files can be attached only from `attachmentFolders` and `approvalFolders`. Paths are resolved to the real file first (links, Windows short names), network paths (`\\server\share`), alternate data streams and names ending in a dot or space are rejected before the disk is touched. The program folder, the config file and the send log are refused by file identity, so renamed paths and hard links do not get around it. Files that usually hold secrets are always refused: dot files and hidden folders (`.env`, `.ssh`, `.git`, ...), SSH keys, `.pem/.key/.pfx/.p12`, password databases (`.kdbx`), mail archives (`.pst`), `.rdp/.ovpn`, `accounts*.json`, `credentials.*`, `secrets.*`.
+6. **Confirmation on the computer.** Files from `approvalFolders` are attached only after you click **Yes** in a native dialog. The assistant cannot answer it, no answer within 45 seconds means No, and the dialog always appears on top of other windows.
+7. **Safe saving.** Received attachments are saved only under `saveFolder`, with sanitised names (no path tricks, no reserved Windows names, no right-to-left filename spoofing), never overwriting anything. On Windows they are marked as downloaded from the internet, so SmartScreen and Office Protected View still warn you. They are never opened.
+8. **Encryption.** On ports without implicit TLS, STARTTLS is required, so a password is never sent in clear text.
+9. **Recipients you can see.** Each recipient entry must be exactly one address, so what the header shows is what is delivered. Bcc is never sent to recipients but is kept in your own Sent/Drafts copy.
+10. **Limits.** Recipients and attachments per message and messages per hour are capped.
+11. **Audit log.** Every sent message is appended to `sent-log.txt` next to the config file: time, sender, recipients, subject, attachments.
 
 ### What it does not protect against
 
 - **Passwords on disk.** `accounts.json` stores passwords in plain text unless you use `passwordEnv`. Anyone with access to your user account can read it. Prefer app passwords where your provider offers them, and keep the file private.
 - **Approving a bad email.** If you approve a message, it is sent. Read what you approve.
 - **Your mail provider's own features.** Server-side filters, forwarding rules and webmail are outside this tool.
+- **Misleading message content.** An email can show different text in its HTML view than in its plain-text part, or hide text with styling. The assistant reads the plain text when there is one. Do not trust a summary of a suspicious email more than the email itself.
+- **Sensitive files with ordinary names.** A bank statement or an ID scan in an allowed folder can still be attached if you approve the email. Keep `attachmentFolders` narrow.
+- **The hourly limit resets when the server restarts.**
 
 See [SECURITY.md](SECURITY.md) for reporting vulnerabilities.
 
