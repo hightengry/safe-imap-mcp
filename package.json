@@ -1,0 +1,55 @@
+{
+  "name": "safe-imap-mcp",
+  "version": "1.0.0",
+  "description": "MCP server that lets AI assistants (Claude and others) read and send email over IMAP/SMTP, with no ability to delete or move messages.",
+  "type": "module",
+  "main": "index.js",
+  "bin": {
+    "safe-imap-mcp": "index.js"
+  },
+  "files": [
+    "index.js",
+    "lib.js",
+    "check.js",
+    "accounts.example.json",
+    "README.md",
+    "README.ru.md",
+    "SECURITY.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "start": "node index.js",
+    "check": "node check.js",
+    "test": "node --test"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "claude",
+    "imap",
+    "smtp",
+    "email",
+    "ai-agent"
+  ],
+  "license": "MIT",
+  "author": "HighTengry LLP (https://hightengry.kz)",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hightengry/safe-imap-mcp.git"
+  },
+  "homepage": "https://github.com/hightengry/safe-imap-mcp#readme",
+  "bugs": {
+    "url": "https://github.com/hightengry/safe-imap-mcp/issues"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "imapflow": "^1.7.8",
+    "mailparser": "^3.12.4",
+    "nodemailer": "^10.2.1",
+    "zod": "^4.6.7"
+  }
+}

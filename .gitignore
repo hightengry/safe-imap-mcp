@@ -1,0 +1,9 @@
+node_modules/
+accounts.json
+accounts.*.json
+!accounts.example.json
+sent-log.txt
+*.log
+.env
+.DS_Store
+Thumbs.db

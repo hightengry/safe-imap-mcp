@@ -1,0 +1,12 @@
+{
+  "defaults": {
+    "imapHost": "mail.example.com",
+    "imapPort": 993,
+    "smtpHost": "mail.example.com",
+    "smtpPort": 465
+  },
+  "accounts": [
+    { "email": "you@example.com", "fromName": "Your Name", "password": "PUT_PASSWORD_HERE" },
+    { "email": "info@example.com", "fromName": "Example Inc.", "passwordEnv": "MAIL_PASSWORD_INFO" }
+  ]
+}
