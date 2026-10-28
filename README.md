@@ -179,6 +179,7 @@ See [SECURITY.md](SECURITY.md) for reporting vulnerabilities.
 ## Compatibility notes
 
 - **Hosting mailboxes (Plesk, cPanel, DirectAdmin, Dovecot/Postfix):** the main target, works with password login.
+- **Thunderbird, Outlook and other mail programs:** not needed and not touched. The connector logs in to the same mailbox on the mail server directly, so you can keep using your mail program as before, no plugin required. Mail kept only in a program's local folders (not on the server) is not visible to it.
 - **Gmail / Google Workspace:** works with `imap.gmail.com` / `smtp.gmail.com` and an app password, if your account or admin still allows app passwords. Gmail stores sent mail by itself, so you may see two copies in Sent.
 - **Microsoft 365 / Outlook.com:** these require OAuth for IMAP/SMTP, which this tool does not support. Use the official Microsoft 365 connector of your assistant instead.
 - Bodies are sent as plain text. HTML composition is not supported.
