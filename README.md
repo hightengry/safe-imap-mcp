@@ -29,93 +29,45 @@ Most email integrations for AI assistants either cover only Gmail and Microsoft 
 
 There is deliberately no tool to delete, move, archive or empty anything, and no tool to create or delete mailboxes.
 
-## Requirements
+## Quick start (about 3 minutes)
 
-- [Node.js](https://nodejs.org) 20 or newer
-- An MCP client: Claude Desktop, Claude Code, or any other client that supports local (stdio) MCP servers
-- IMAP and SMTP access to your mailbox with a password or an app password
-
-## Installation
-
-### 1. Get the code
+You need [Node.js](https://nodejs.org) 20 or newer, Claude Desktop, and your mailbox's server name and password (your hosting panel shows them under something like "Mail client setup").
 
 ```bash
-git clone https://github.com/hightengry/safe-imap-mcp.git
-cd safe-imap-mcp
-npm ci
+npm install -g safe-imap-mcp
+safe-imap-mcp init
+safe-imap-mcp install-claude
 ```
 
-Or download the ZIP from GitHub, unpack it, and run `npm ci` inside the folder. `npm ci` installs exactly the dependency versions recorded in `package-lock.json`.
+1. `init` asks for your mailbox address, server, port and password (hidden while you type), then tests the connection. It sends nothing.
+2. `install-claude` adds the server to Claude Desktop. It shows the change, asks for confirmation and saves a backup of Claude's config first.
+3. Fully quit Claude Desktop (right-click its icon near the clock or in the menu bar, then **Quit**) and open it again.
 
-Keep the program folder outside Desktop, Documents and Downloads if you can (for example `C:\Tools\safe-imap-mcp` or `~/tools/safe-imap-mcp`). The connector refuses to attach anything from its own folder anyway, but it is a good habit.
+Then ask Claude: *"Show my 5 latest emails."*
 
-### 2. Configure your mailboxes
+Check the setup at any time with `safe-imap-mcp check`. It validates the config and folders and tests the connection, and tells you exactly what to fix.
 
-```bash
-cp accounts.example.json accounts.json      # Windows: copy accounts.example.json accounts.json
-```
+## Secure setup (about 15 minutes)
 
-Edit `accounts.json`:
+The defaults are already strict: no deleting, encrypted connections, files with keys and passwords are never attached. These steps close the remaining gaps.
 
-```json
-{
-  "defaults": {
-    "imapHost": "mail.example.com",
-    "imapPort": 993,
-    "smtpHost": "mail.example.com",
-    "smtpPort": 465
-  },
-  "accounts": [
-    { "email": "you@example.com", "fromName": "Your Name", "password": "your-password" },
-    { "email": "info@example.com", "fromName": "Example Inc.", "passwordEnv": "MAIL_PASSWORD_INFO" }
-  ]
-}
-```
+1. **Keep passwords out of the config file.** In `init`, choose "environment variable", or edit the config: replace `"password": "..."` with `"passwordEnv": "MAIL_PASSWORD_YOU"` and set that variable (Windows: `setx MAIL_PASSWORD_YOU "your-password"`, then open a new window and restart Claude). Use an app password if your provider offers one.
+2. **Narrow the attachment folders.** By default files may be attached from Desktop, Documents and Downloads. Allow only what you need, and put sensitive folders under `approvalFolders` so that every attachment from them needs your **Yes** in a dialog on your computer:
 
-Your hosting control panel usually shows the server names and ports under something like "Mail client setup" or "Manual configuration".
+   ```json
+   {
+     "attachmentFolders": ["C:\\Users\\you\\Documents\\Outgoing"],
+     "approvalFolders": ["D:\\Work"],
+     "accounts": [ "..." ]
+   }
+   ```
+3. **Approve each send.** When Claude Desktop first asks permission for `send_email` (and for `save_draft` with attachments), choose **Allow once**, never "Always allow".
+4. **Look at the activity log now and then.** `sent-log.txt` next to the config records sent mail, drafts with attachments, saved attachments and every Yes/No decision.
+5. Run `safe-imap-mcp check` again. Warnings tell you what is still open.
 
-`accounts.json` is listed in `.gitignore` and will not be committed.
+### Configuration reference
 
-### 3. Test the connection
-
-```bash
-npm run check
-```
-
-It logs in to IMAP and SMTP for each mailbox and reports `ok` or the error. It sends nothing and changes nothing.
-
-### 4. Connect it to your assistant
-
-**Claude Desktop.** Open *Settings → Developer → Edit Config* and add the server to `claude_desktop_config.json`:
-
-```json
-{
-  "mcpServers": {
-    "email": {
-      "command": "node",
-      "args": ["C:\\path\\to\\safe-imap-mcp\\index.js"]
-    }
-  }
-}
-```
-
-On macOS/Linux use a normal path, e.g. `"/Users/you/safe-imap-mcp/index.js"`. If the file already has an `mcpServers` section, add only the `"email": {...}` entry to it. Fully quit and restart Claude Desktop.
-
-If Claude reports that `node` cannot be found, use the full path, e.g. `"C:\\Program Files\\nodejs\\node.exe"` or the output of `which node`.
-
-**Claude Code.**
-
-```bash
-claude mcp add email -- node /path/to/safe-imap-mcp/index.js
-```
-
-**Other clients:** run `node index.js` as a stdio MCP server.
-
-### 5. Try it
-
-> Show me the 5 latest emails in you@example.com.
-
-## Configuration reference
+The config is at `~/.safe-imap-mcp/accounts.json` (Windows: `C:\Users\<you>\.safe-imap-mcp\accounts.json`). `safe-imap-mcp help` prints the exact path. It is re-read on every call, so changes need no restart.
 
 | Key | Where | Default | Meaning |
 |---|---|---|---|
@@ -136,18 +88,53 @@ claude mcp add email -- node /path/to/safe-imap-mcp/index.js
 | `limits.maxAttachmentMB` | top level | `20` | Max total attachment size per message |
 | `limits.maxSendsPerHour` | top level | `20` | Max messages sent per hour (counted while the server runs) |
 
-Example of a strict setup: attach freely only from one folder, from your projects only after confirmation:
+
+## Advanced setup
+
+### Install from source
+
+```bash
+git clone https://github.com/hightengry/safe-imap-mcp.git
+cd safe-imap-mcp
+npm ci
+node index.js init
+node index.js install-claude
+```
+
+`npm ci` installs exactly the dependency versions in `package-lock.json`. With a source install, an `accounts.json` placed next to `index.js` is used if present.
+
+### Configure Claude Desktop by hand
+
+Open *Settings → Developer → Edit Config* and add, inside `"mcpServers"`:
 
 ```json
-{
-  "attachmentFolders": ["C:\\Users\\you\\Documents\\Outgoing"],
-  "approvalFolders": ["D:\\Work"],
-  "defaults": { "...": "..." },
-  "accounts": [ "..." ]
+"email": {
+  "command": "C:\\Program Files\\nodejs\\node.exe",
+  "args": ["C:\\path\\to\\safe-imap-mcp\\index.js"]
 }
 ```
 
-The config file is re-read on every call, so you can change passwords or limits without restarting. To keep the config elsewhere, set `MAIL_ACCOUNTS_FILE=/path/to/accounts.json` in the server's environment (in Claude Desktop, via an `"env"` block next to `"args"`).
+`safe-imap-mcp help` prints both paths for your computer. Use full paths: Claude Desktop does not always find `node` on its own.
+
+### Claude Code and other clients
+
+```bash
+claude mcp add email -- node /path/to/safe-imap-mcp/index.js
+```
+
+Any other MCP client: run `node index.js` (no arguments) as a stdio server.
+
+### Where the config is read from
+
+1. the file in the `MAIL_ACCOUNTS_FILE` environment variable, if set (in Claude Desktop, add `"env": { "MAIL_ACCOUNTS_FILE": "..." }` next to `"args"`);
+2. `accounts.json` next to `index.js` (source installs);
+3. `~/.safe-imap-mcp/accounts.json`.
+
+### Troubleshooting
+
+- **"running scripts is disabled on this system" in PowerShell:** run `safe-imap-mcp.cmd init` instead, or use Command Prompt.
+- **The server does not appear in Claude:** fully quit and reopen Claude Desktop; check *Settings → Developer* for an error; run `safe-imap-mcp check`.
+- **Login fails:** the check prints the server's answer. Wrong password and wrong port are the usual causes.
 
 ## Safety model
 
@@ -163,7 +150,7 @@ The design goal is that a confused, mistaken or manipulated assistant cannot des
 8. **Encryption.** On ports without implicit TLS, STARTTLS is required, so a password is never sent in clear text.
 9. **Recipients you can see.** Each recipient entry must be exactly one address, so what the header shows is what is delivered. Bcc is never sent to recipients but is kept in your own Sent/Drafts copy.
 10. **Limits.** Recipients and attachments per message and messages per hour are capped.
-11. **Audit log.** Every sent message is appended to `sent-log.txt` next to the config file: time, sender, recipients, subject, attachments.
+11. **Activity log.** `sent-log.txt` next to the config file records sent mail, drafts with attachments, saved attachments and every Yes/No decision in the approval dialog.
 
 ### What it does not protect against
 

@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.1.0
+
+Easier, safer setup. No change to what the assistant can do with mail.
+
+- `safe-imap-mcp init`: step-by-step setup wizard; passwords are hidden while typing, or kept in an environment variable.
+- `safe-imap-mcp check`: validates Node.js, the config, every mailbox and the folders, then tests IMAP and SMTP, with a clear message for each problem (`--offline` skips the connection test).
+- `safe-imap-mcp install-claude`: adds the server to Claude Desktop with a backup, a confirmation and full paths to Node.js and the server; never replaces an existing entry without `--force`.
+- Installable from npm: `npm install -g safe-imap-mcp`. For global installs the config lives in `~/.safe-imap-mcp/accounts.json`; source installs keep using `accounts.json` next to the program.
+- The activity log now also records drafts with attachments, saved attachments and every Yes/No decision in the approval dialog.
+- README restructured into Quick start, Secure setup and Advanced setup.
+
 ## 1.0.0
 
 First public release.

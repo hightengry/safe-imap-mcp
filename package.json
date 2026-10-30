@@ -1,6 +1,6 @@
 {
   "name": "safe-imap-mcp",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "MCP server that lets AI assistants (Claude and others) read and send email over IMAP/SMTP, with no ability to delete or move messages.",
   "type": "module",
   "main": "index.js",
@@ -9,6 +9,9 @@
   },
   "files": [
     "index.js",
+    "server.js",
+    "cli.js",
+    "doctor.js",
     "lib.js",
     "check.js",
     "accounts.example.json",
@@ -20,7 +23,9 @@
   ],
   "scripts": {
     "start": "node index.js",
+    "init": "node index.js init",
     "check": "node check.js",
+    "install-claude": "node index.js install-claude",
     "test": "node --test"
   },
   "keywords": [

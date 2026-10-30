@@ -23,15 +23,29 @@ const CASE_INSENSITIVE = IS_WIN || process.platform === "darwin";
 
 // ---------- Configuration ----------
 
+// Default location for a global (npm) install: a folder in the user's home.
+export function homeConfigPath() {
+  return path.join(os.homedir(), ".safe-imap-mcp", "accounts.json");
+}
+
+// Where the config is read from, in order:
+// 1. MAIL_ACCOUNTS_FILE, 2. accounts.json next to the program (cloned installs), 3. ~/.safe-imap-mcp/accounts.json
+export function configSource() {
+  if (process.env.MAIL_ACCOUNTS_FILE) return { path: path.resolve(process.env.MAIL_ACCOUNTS_FILE), from: "MAIL_ACCOUNTS_FILE" };
+  const local = path.join(APP_DIR, "accounts.json");
+  if (fs.existsSync(local)) return { path: local, from: "program folder" };
+  return { path: homeConfigPath(), from: "home folder" };
+}
+
 export function configPath() {
-  return process.env.MAIL_ACCOUNTS_FILE ? path.resolve(process.env.MAIL_ACCOUNTS_FILE) : path.join(APP_DIR, "accounts.json");
+  return configSource().path;
 }
 
 // Re-read on every call so edits to the config take effect without a restart.
 export function loadConfig() {
   const file = configPath();
   if (!fs.existsSync(file)) {
-    throw new Error(`Config file not found: ${file}. Copy accounts.example.json to accounts.json and fill it in.`);
+    throw new Error(`Config file not found: ${file}. Run "safe-imap-mcp init" (or "npm run init") to create it.`);
   }
   let raw = fs.readFileSync(file, "utf8");
   if (raw.charCodeAt(0) === 0xfeff) raw = raw.slice(1); // Windows Notepad may add a BOM
@@ -337,6 +351,9 @@ async function requireApproval(files, ctx) {
     `The AI assistant wants to ${ctx.action} with files from a protected folder:\n\n${lines}\n\n` +
     `From: ${ctx.from}\nTo: ${ctx.to.join(", ")}\nSubject: ${String(ctx.subject).slice(0, 150)}\n\nAllow this?`;
   const ok = await approver(msg.slice(0, 3000));
+  logSend(
+    `${ok ? "APPROVED" : "DENIED"}  ${ctx.action} with protected files  from: ${ctx.from}  to: ${ctx.to.join(", ")}  files: ${files.map((f) => f.path).join(", ")}`
+  );
   if (!ok) throw new Error("Not approved on the computer: the attachment from a protected folder was refused or the dialog timed out.");
 }
 
